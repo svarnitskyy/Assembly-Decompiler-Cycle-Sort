@@ -1,0 +1,275 @@
+//author: Svyatoslav Varnitskyy
+//netid: svarnits
+B main
+
+
+fill:
+ADD X20, XZR, X0 //save array size
+ADD X9, XZR, X20 //for n--
+ADD X11, XZR, X19 //save x19 to restore
+SUBI X9, X9, #1 //n-1
+fillinner:
+STUR X9, [X19, #0] //Store in array
+SUBI X9, X9, #1// Subtract 1 from N
+ADDI X19, X19, #8//Add 8 to offset
+SUBS XZR, X9, XZR
+B.GE fillinner
+ADD X19, XZR, X11
+BR LR
+
+swap:
+
+LDUR X11, [X0, #0]
+LDUR X12, [X1, #0]
+
+STUR X12, [X0, #0]
+STUR X11, [X1, #0]
+
+BR LR
+
+skip_duplicates:
+ADD X9, XZR, X0 //index = start
+skip_duplicates_loop:
+LSL X10, X9, #3
+ADD X10, X19, X10 //@a[index]
+LDUR X10, [X10, #0]
+SUB X10, X1, X10
+CBNZ X10, skip_duplicates_return
+ADDI X9, X9, #1 //index++
+B skip_duplicates_loop
+skip_duplicates_return:
+ADD X0, XZR, X9
+BR LR
+
+
+//X19 Array
+//X20 N size of array
+//X0 start
+//X1 value
+//X2 end
+//X3 index
+
+
+find_index:
+//X9 = i
+//X10 = index
+ADDI X9, X0, #1 // i = start + 1
+ADD X10, X0, XZR //index = start
+B find_index_loop
+
+find_index_loop:
+SUBS XZR, X9, X20 //i < n
+B.GE find_index_return
+
+LSL X11, X9, #3//offset
+ADD X11, X19, X11//X11 = @a[i]
+LDUR X11, [X11, #0]//X11 = a[i]
+
+SUBS XZR, X11, X1 //a[i] < value
+B.GE after_if
+ADDI X10, X10, #1//index++
+B after_if
+
+after_if:
+ADDI X9, X9, #1//i++
+B find_index_loop
+
+find_index_return:
+ADD X0, XZR, X10 //start = index
+BR LR
+
+//X19 Array
+//X20 N size of array
+//X0 start
+//X1 value
+//X2 end
+//X3 index
+binary_search:
+
+SUBS XZR, X2, X0 //end < start
+B.LT binary_search_error //go to return
+
+ADD X10, X0, X2 //index = start+end
+LSR X10, X10, #1 //index = (start+end)/2
+ADD X12, XZR, X10 //save index
+LSL X10, X10, #3//index *= 3
+ADD X10, X10, X19// @a[index]
+LDUR X10, [X10, #0]//a[index]
+SUB X11, X10, X1 //a[index] == value
+CBZ X11, binary_search_match
+
+SUBS XZR, X10, X1//a[index] > value
+B.GT binary_search_left
+
+ADDI X0, X12, #1
+B binary_search
+
+binary_search_left:
+SUBI X2, X12, #1
+B binary_search
+
+binary_search_match:
+ADD X0, XZR, X12 //return index
+BR LR
+
+binary_search_error:
+SUBI X0, XZR, #1 //return -1
+BR LR
+
+//X19 Array
+//X20 N size of array
+//X0 start
+//X1 value
+//X2 end
+//X3 index
+complete_cycle:
+ADD X21, XZR, LR //SAVE LINK
+ADD X23, XZR, X0 //SAVE START
+
+complete_cycle_loop:
+SUB X9, X3, X0
+CBZ X9, complete_cycle_end
+
+BL find_index //index = find_index(a, n, start, value)
+
+ADD X3, XZR, X0 
+
+BL skip_duplicates
+ADD X3, XZR, X0 //index = skip_duplicates(a, index, value)
+ADD X0, XZR, X23//restore start
+
+
+ADD X13, XZR, X1
+
+LSL X14, X3, #3
+ADD X14, X14, X19
+LDUR X1, [X14, #0]
+STUR X13, [X14, #0]
+
+B complete_cycle_loop
+
+complete_cycle_end:
+ADD LR, XZR, X21
+BR LR
+
+
+//X19 Array
+//X20 N size of array
+//X0 start
+//X1 value
+//X2 end
+//X3 index
+cycle_sort:
+ADD X22, XZR, LR //SAVE LINK
+ADDI X24, XZR, #0 //cstart = 0
+B cycle_sort_loop
+cycle_sort_loop:
+SUBI X10, X20, #1 //n - 1
+SUBS X27, X24, X10 //cstart < n - 1
+B.GE cycle_sort_end
+
+LSL X25, X24, #3 //SAVE a[cstart]
+ADD X25, X25, X19 //@a[cstart]
+LDUR X25, [X25, #0] //val = a[cstart]
+
+ADD X0, XZR, X24 //start = cstart
+ADD X1, XZR, X25 //value = val
+
+BL find_index
+ADD X12, XZR, X0 // idx = find_index(a, n, cstart, val);
+
+SUB X13, X24, X12 //if (idx == cstart)
+CBZ X13, cycle_sort_loop_end //if (idx == cstart)
+
+ADD X0, XZR, X12 //start = idx
+ADD X1, XZR, X25 //value = val = a[cstart]
+BL skip_duplicates
+ADD X12, XZR, X0 //idx = skip_duplicates(a, idx, val);
+
+
+ADD X13, XZR, X25 //temp = val
+
+LSL X12, X12, #3
+ADD X12, X12, X19
+LDUR X25, [X12, #0]
+STUR X13, [X12, #0]
+
+ADD X0, XZR, X24 //start = cstart
+ADD X3, XZR, X13//index = idx
+ADD X1, XZR, X25//value = val
+
+BL complete_cycle
+B cycle_sort_loop_end
+
+cycle_sort_loop_end:
+ADDI X24, X24, #1 //cstart++
+B cycle_sort_loop
+
+cycle_sort_end:
+ADD LR, XZR, X22 //RESTORE LINK
+BR LR
+
+
+//X19 Array
+//X20 N size of array
+//X0 start
+//X1 value
+//X2 end
+//X3 index
+
+main:
+SUBI SP, SP, #64
+
+STUR X19, [SP, #0]
+STUR X20, [SP, #8]
+STUR X21, [SP, #16]
+STUR X22, [SP, #24]
+STUR X23, [SP, #32]
+STUR X24, [SP, #40]
+STUR X25, [SP, #48]
+STUR LR, [SP, #56]
+
+ADD X19, X9, XZR
+ADDI X0, XZR, #100 //input array size
+
+BL fill
+BL cycle_sort
+
+//search for 0
+ADDI X0, XZR, #0
+SUBI X2, X20, #1
+ADDI X1, XZR, #0
+BL binary_search
+PRNT X0
+
+//search for n - 1
+ADDI X0, XZR, #0
+SUBI X2, X20, #1
+SUBI X1, X20, #1
+BL binary_search
+PRNT X0
+
+//search for n/2
+ADDI X0, XZR, #0
+SUBI X2, X20, #1
+LSR X1, X20, #1
+BL binary_search
+PRNT X0
+
+//ssearch for n
+ADDI X0, XZR, #0
+SUBI X2, X20, #1
+ADD X1, X20, XZR
+BL binary_search
+PRNT X0
+
+LDUR X19, [SP, #0]
+LDUR X20, [SP, #8]
+LDUR X21, [SP, #16]
+LDUR X22, [SP, #24]
+LDUR X23, [SP, #32]
+LDUR X24, [SP, #40]
+LDUR X25, [SP, #48]
+LDUR LR, [SP, #56]
+ADDI SP, SP, #64
+
